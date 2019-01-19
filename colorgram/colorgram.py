@@ -1,21 +1,23 @@
 # -*- coding: utf-8 -*-
 
-from __future__ import unicode_literals
 from __future__ import division
+from __future__ import unicode_literals
 
 import array
+import csv
+import os
+import sys
+from collections import namedtuple
+
+import numpy as np
+from PIL import Image
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.neural_network import MLPClassifier
 from sklearn.svm import SVC
-import numpy as np
-from collections import namedtuple
-from PIL import Image
 
-import sys
-import os
-import csv
 try:
     import cPickle
+
     pickle = cPickle
 except ImportError:
     import pickle
@@ -26,16 +28,17 @@ if sys.version_info[0] <= 2:
 else:
     ARRAY_DATATYPE = 'l'
 
-LIB_PATH = os.path.dirname(__file__)    
+LIB_PATH = os.path.dirname(__file__)
 
 Rgb = namedtuple('Rgb', ('r', 'g', 'b'))
 Hsl = namedtuple('Hsl', ('h', 's', 'l'))
+
 
 class Color(object):
     def __init__(self, r, g, b, proportion):
         self.rgb = Rgb(r, g, b)
         self.proportion = proportion
-    
+
     def __repr__(self):
         return "<colorgram.py Color: {}, {}%>".format(
             str(self.rgb), str(self.proportion * 100))
@@ -48,25 +51,27 @@ class Color(object):
             self._hsl = Hsl(*hsl(*self.rgb))
             return self._hsl
 
+
 def extract(f, number_of_colors):
     image = f if isinstance(f, Image.Image) else Image.open(f)
     if image.mode not in ('RGB', 'RGBA', 'RGBa'):
         image = image.convert('RGB')
-    
+
     samples = sample(image)
     used = pick_used(samples)
     used.sort(key=lambda x: x[0], reverse=True)
     return get_colors(samples, used, number_of_colors)
 
+
 def sample(image):
     top_two_bits = 0b11000000
 
-    sides = 1 << 2 # Left by the number of bits used.
+    sides = 1 << 2  # Left by the number of bits used.
     cubes = sides ** 7
 
     samples = array.array(ARRAY_DATATYPE, (0 for _ in range(cubes)))
     width, height = image.size
-    
+
     pixels = image.load()
     for y in range(height):
         for x in range(width):
@@ -80,7 +85,7 @@ def sample(image):
 
             # Everything's shifted into place from the top two
             # bits' original position - that is, bits 7-8.
-            packed  = (Y & top_two_bits) << 4
+            packed = (Y & top_two_bits) << 4
             packed |= (h & top_two_bits) << 2
             packed |= (l & top_two_bits) << 0
 
@@ -102,11 +107,12 @@ def sample(image):
             # print "Packed: {}, binary: {}".format(str(packed), bin(packed)[2:])
             # print
             packed *= 4
-            samples[packed]     += r
+            samples[packed] += r
             samples[packed + 1] += g
             samples[packed + 2] += b
             samples[packed + 3] += 1
     return samples
+
 
 def pick_used(samples):
     used = []
@@ -115,6 +121,7 @@ def pick_used(samples):
         if count:
             used.append((count, i))
     return used
+
 
 def get_colors(samples, used, number_of_colors):
     pixels = 0
@@ -125,7 +132,7 @@ def get_colors(samples, used, number_of_colors):
         pixels += count
 
         color = Color(
-            samples[index]     // count,
+            samples[index] // count,
             samples[index + 1] // count,
             samples[index + 2] // count,
             count
@@ -135,6 +142,7 @@ def get_colors(samples, used, number_of_colors):
     for color in colors:
         color.proportion /= pixels
     return colors
+
 
 def hsl(r, g, b):
     # This looks stupid, but it's way faster than min() and max().
@@ -163,7 +171,7 @@ def hsl(r, g, b):
             s = diff * 255 // (510 - most - least)
         else:
             s = diff * 255 // (most + least)
-        
+
         if most == r:
             h = (g - b) * 255 // diff + (1530 if g < b else 0)
         elif most == g:
@@ -171,23 +179,24 @@ def hsl(r, g, b):
         else:
             h = (r - g) * 255 // diff + 1020
         h //= 6
-    
+
     return h, s, l
 
 
 class Model(object):
     TYPE = {
         'nn': (MLPClassifier, {
-            'solver': 'lbfgs', 
-            'verbose': True, 
-            #'tol': 0.0, 
-            'shuffle': False, 
-            #'alpha': 10,
+            'solver': 'lbfgs',
+            'verbose': True,
+            # 'tol': 0.0,
+            'shuffle': False,
+            # 'alpha': 10,
             'learning_rate': 'invscaling',
-            }),
+        }),
         'kn': (KNeighborsClassifier, {'n_neighbors': 5}),
         'svm': (SVC, {'gamma': 2, 'C': 1})
     }
+
     def __init__(self, model_data='colors.data', model_input='colors.csv', model_type='nn'):
         self.model_data = model_data
         self.model_input = model_input
@@ -195,7 +204,7 @@ class Model(object):
         self.model_trained = None
 
     @property
-    def model_input_path(self):        
+    def model_input_path(self):
         return os.path.join(LIB_PATH, self.model_input)
 
     @property
@@ -222,19 +231,13 @@ class Model(object):
     def train(self):
         X, y = self.load_input()
         model_class, model_args = self.TYPE.get(self.model_type)
-        self.model_trained = model_class(**model_args)        
+        self.model_trained = model_class(**model_args)
         self.model_trained.fit(X, y)
 
     def predict(self, rgb):
         r, g, b = rgb
         X = [[float(r), float(g), float(b)]]
         return str(self.model_trained.predict(X)[0])
-
-
-
-
-
-
 
 # Useful snippet for testing values:
 # print "Pixel #{}".format(str(y * width + x))
