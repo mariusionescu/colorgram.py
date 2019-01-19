@@ -20,3 +20,14 @@ def test_color_access():
     assert (color.hsl.h, color.hsl.s, color.hsl.l) == color.hsl
 
     assert color.proportion == 0.15
+
+def test_color_prediction():
+
+    model = colorgram.Model(model_type='svm')
+    model.train()
+
+    print(model.predict([245, 245, 98]))
+    assert model.predict([245, 245, 98]) == 'yellow'
+    assert model.predict([98, 245, 127]) == 'green'
+    assert model.predict([98, 132, 245]) == 'blue'
+    assert model.predict([114, 114, 114]) == 'grey'

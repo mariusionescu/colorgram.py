@@ -6,7 +6,8 @@ from setuptools import setup
 VERSION = '1.2.0'
 
 REQUIREMENTS = [
-    "pillow >= 3.3.1"
+    "pillow >= 3.3.1",
+    "scikit-learn"
 ]
 
 with open("readme.rst", 'r') as f:
@@ -17,6 +18,10 @@ setup(
     version=VERSION,
     install_requires=REQUIREMENTS,
     packages=['colorgram'],
+    package_data={'colorgram': [
+        'colors.csv',
+        'colors.data'
+    ]},
     author="Samuel Messner",
     author_email="powpowd@gmail.com",
     url="https://github.com/obskyr/colorgram.py",

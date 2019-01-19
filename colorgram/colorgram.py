@@ -4,15 +4,29 @@ from __future__ import unicode_literals
 from __future__ import division
 
 import array
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.neural_network import MLPClassifier
+from sklearn.svm import SVC
+import numpy as np
 from collections import namedtuple
 from PIL import Image
 
 import sys
+import os
+import csv
+try:
+    import cPickle
+    pickle = cPickle
+except ImportError:
+    import pickle
+
 if sys.version_info[0] <= 2:
     range = xrange
     ARRAY_DATATYPE = b'l'
 else:
     ARRAY_DATATYPE = 'l'
+
+LIB_PATH = os.path.dirname(__file__)    
 
 Rgb = namedtuple('Rgb', ('r', 'g', 'b'))
 Hsl = namedtuple('Hsl', ('h', 's', 'l'))
@@ -159,6 +173,68 @@ def hsl(r, g, b):
         h //= 6
     
     return h, s, l
+
+
+class Model(object):
+    TYPE = {
+        'nn': (MLPClassifier, {
+            'solver': 'lbfgs', 
+            'verbose': True, 
+            #'tol': 0.0, 
+            'shuffle': False, 
+            #'alpha': 10,
+            'learning_rate': 'invscaling',
+            }),
+        'kn': (KNeighborsClassifier, {'n_neighbors': 5}),
+        'svm': (SVC, {'gamma': 2, 'C': 1})
+    }
+    def __init__(self, model_data='colors.data', model_input='colors.csv', model_type='nn'):
+        self.model_data = model_data
+        self.model_input = model_input
+        self.model_type = model_type
+        self.model_trained = None
+
+    @property
+    def model_input_path(self):        
+        return os.path.join(LIB_PATH, self.model_input)
+
+    @property
+    def model_data_path(self):
+        return os.path.join(LIB_PATH, self.model_data)
+
+    def load_input(self):
+        X = []
+        y = []
+        with open(self.model_input_path) as f:
+            for row in csv.reader(f):
+                X.append([float(row[2]), float(row[3]), float(row[4])])
+                y.append(row[0])
+        return np.array(X), np.array(y)
+
+    def save(self):
+        with open(self.model_data_path, 'wb') as f:
+            pickle.dump(self.model_trained, f)
+
+    def load(self):
+        with open(self.model_data_path, 'rb') as f:
+            self.model_trained = pickle.load(f)
+
+    def train(self):
+        X, y = self.load_input()
+        model_class, model_args = self.TYPE.get(self.model_type)
+        self.model_trained = model_class(**model_args)        
+        self.model_trained.fit(X, y)
+
+    def predict(self, rgb):
+        r, g, b = rgb
+        X = [[float(r), float(g), float(b)]]
+        return str(self.model_trained.predict(X)[0])
+
+
+
+
+
+
 
 # Useful snippet for testing values:
 # print "Pixel #{}".format(str(y * width + x))
