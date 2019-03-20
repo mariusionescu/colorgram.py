@@ -11,9 +11,7 @@ from collections import namedtuple
 
 import numpy as np
 from PIL import Image
-from sklearn.neighbors import KNeighborsClassifier
 from sklearn.neural_network import MLPClassifier
-from sklearn.svm import SVC
 
 try:
     import cPickle
@@ -32,6 +30,19 @@ LIB_PATH = os.path.dirname(__file__)
 
 Rgb = namedtuple('Rgb', ('r', 'g', 'b'))
 Hsl = namedtuple('Hsl', ('h', 's', 'l'))
+
+COLORS2INT = {
+    'None': -1,
+    'grey': 0,
+    'blue': 1,
+    'brown': 2,
+    'green': 3,
+    'orange': 4,
+    'red': 5,
+    'violet': 6,
+    'white': 7,
+    'yellow': 8
+}
 
 
 class Color(object):
@@ -183,24 +194,55 @@ def hsl(r, g, b):
     return h, s, l
 
 
-class Model(object):
-    TYPE = {
-        'nn': (MLPClassifier, {
-            'solver': 'lbfgs',
-            'verbose': True,
-            # 'tol': 0.0,
-            'shuffle': False,
-            # 'alpha': 10,
-            'learning_rate': 'invscaling',
-        }),
-        'kn': (KNeighborsClassifier, {'n_neighbors': 5}),
-        'svm': (SVC, {'gamma': 2, 'C': 1})
-    }
+def extract_as_text(f, number_of_colors):
 
-    def __init__(self, model_data='colors.data', model_input='colors.csv', model_type='nn'):
+    f = Image.fromarray(f)
+    colors_text = {}
+    model = Model()
+    model.load()
+
+    colors = extract(f, number_of_colors)
+
+    for color in colors:
+        c_text = model.predict((color.rgb.r, color.rgb.g, color.rgb.b))
+        _c = colors_text.get(c_text, 0)
+        _c += color.proportion
+        colors_text[c_text] = _c
+
+    colors_text = list(set(colors_text))
+    return colors_text
+
+
+def extract_as_int(f, number_of_colors, flat=True):
+    colors = extract_as_text(f, number_of_colors)
+
+    colors_int = []
+    colors_bool = []
+
+    for color in colors:
+        c_int = COLORS2INT[color]
+        colors_int.append(c_int)
+
+    while len(colors_int) < number_of_colors:
+        colors_int.append(COLORS2INT['None'])
+
+    for _c in ['grey', 'blue', 'brown', 'green', 'orange', 'red', 'violet', 'white', 'yellow']:
+        if _c in colors:
+            colors_bool.append(1)
+        else:
+            colors_bool.append(0)
+
+    if flat:
+        return colors_bool
+    else:
+        return colors_int
+
+
+class Model(object):
+
+    def __init__(self, model_data='colors.data', model_input='colors.csv'):
         self.model_data = model_data
         self.model_input = model_input
-        self.model_type = model_type
         self.model_trained = None
 
     @property
@@ -225,13 +267,27 @@ class Model(object):
             pickle.dump(self.model_trained, f)
 
     def load(self):
+        if not os.path.exists(self.model_data_path):
+            self.train()
+            self.save()
         with open(self.model_data_path, 'rb') as f:
             self.model_trained = pickle.load(f)
 
     def train(self):
         X, y = self.load_input()
-        model_class, model_args = self.TYPE.get(self.model_type)
-        self.model_trained = model_class(**model_args)
+        self.model_trained = MLPClassifier(
+            hidden_layer_sizes=(64, 64),
+            activation='relu',
+            solver='sgd',
+            alpha=0.0001,
+            batch_size='auto',
+            tol=0.000001,
+            learning_rate='constant',
+            learning_rate_init=0.0001,
+            max_iter=50000,
+            n_iter_no_change=50000,
+            verbose=True
+        )
         self.model_trained.fit(X, y)
 
     def predict(self, rgb):
@@ -255,3 +311,8 @@ class Model(object):
 # console.log("Y: " + Y);
 # console.log("Packed: " + v + ", binary: " + (v >>> 0).toString(2));
 # console.log();
+
+
+if __name__ == '__main__':
+    model_c = Model()
+    model_c.train()
