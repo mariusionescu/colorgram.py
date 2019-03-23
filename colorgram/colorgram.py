@@ -209,7 +209,6 @@ def extract_as_text(f, number_of_colors):
         _c += color.proportion
         colors_text[c_text] = _c
 
-    colors_text = list(set(colors_text))
     return colors_text
 
 
@@ -276,7 +275,7 @@ class Model(object):
     def train(self):
         X, y = self.load_input()
         self.model_trained = MLPClassifier(
-            hidden_layer_sizes=(64, 64),
+            hidden_layer_sizes=(16, 16),
             activation='relu',
             solver='sgd',
             alpha=0.0001,
@@ -284,8 +283,8 @@ class Model(object):
             tol=0.000001,
             learning_rate='constant',
             learning_rate_init=0.0001,
-            max_iter=50000,
-            n_iter_no_change=50000,
+            max_iter=10000,
+            n_iter_no_change=10000,
             verbose=True
         )
         self.model_trained.fit(X, y)
