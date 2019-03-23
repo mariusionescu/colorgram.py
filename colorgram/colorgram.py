@@ -205,36 +205,17 @@ def extract_as_text(f, number_of_colors):
 
     for color in colors:
         c_text = model.predict((color.rgb.r, color.rgb.g, color.rgb.b))
-        _c = colors_text.get(c_text, 0)
-        _c += color.proportion
+        _c = colors_text.get(c_text, [0.0, 0, 0, 0])
+        c_proportion, r, g, b = _c
+        c_proportion += color.proportion
+        r = (r + color.rgb.r) / 2
+        g = (g + color.rgb.g) / 2
+        b = (b + color.rgb.b) / 2
+
+        _c = (c_proportion, r, g, b)
         colors_text[c_text] = _c
 
     return colors_text
-
-
-def extract_as_int(f, number_of_colors, flat=True):
-    colors = extract_as_text(f, number_of_colors)
-
-    colors_int = []
-    colors_bool = []
-
-    for color in colors:
-        c_int = COLORS2INT[color]
-        colors_int.append(c_int)
-
-    while len(colors_int) < number_of_colors:
-        colors_int.append(COLORS2INT['None'])
-
-    for _c in ['grey', 'blue', 'brown', 'green', 'orange', 'red', 'violet', 'white', 'yellow']:
-        if _c in colors:
-            colors_bool.append(1)
-        else:
-            colors_bool.append(0)
-
-    if flat:
-        return colors_bool
-    else:
-        return colors_int
 
 
 class Model(object):
